@@ -1,0 +1,952 @@
+library(tidyverse)
+library(lubridate)
+library(stat5730covid19)
+library(shinythemes)
+library(RcppRoll)
+
+
+## I have read the data here for the countries and USA states.
+
+covid19_global_confirmed_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
+covid19_global_deaths_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv"
+covid19_global_recovered_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv"
+covid19_usa_url <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+
+## Function for cleaning up the data 
+
+to_cases_by_date <- function(x, values_to = "cases") {
+    x <- pivot_longer(x, cols = -(1:4), names_to = "date", values_to = values_to)
+    mutate(x, date = lubridate::mdy(date))
+}
+
+## Reading and cleaning up the data
+
+covid19_global_confirmed <- read_csv(covid19_global_confirmed_url) %>%
+    to_cases_by_date("cases")
+
+covid19_global_deaths <- read_csv(covid19_global_deaths_url) %>%
+    to_cases_by_date("deaths")
+
+covid19_global_recovered <- read_csv(covid19_global_recovered_url) %>%
+    to_cases_by_date("recovered")
+
+covid19_global <- left_join(covid19_global_confirmed, covid19_global_deaths)
+covid19_global <- covid19_global %>% left_join(covid19_global_recovered)
+
+covid19_usa <- read_csv(covid19_usa_url)
+
+pop_cont <- population %>% filter(year == 2013) 
+
+
+## Adjusting column names to match with covid19_global and removing columns that dont have data for population
+
+population$country[population$country == "United States of America"] <- "US"
+population$country[population$country == "United Kingdom of Great Britain and Northern Ireland"] <-  "United Kingdom"
+population$country[population$country == "Bolivia (Plurinational State of)"] <- "Bolivia"
+population$country[population$country == "Russian Federation"] <-  "Russia"  
+population$country[population$country == "Venezuela (Bolivarian Republic of)"] <-  "Venezuela"   
+population$country[population$country == "Brunei Darussalam" ] <- "Brunei"
+population$country[population$country == "Lao People's Democratic Republic"] <-  "Laos"
+population$country[population$country == "Syrian Arab Republic"] <- "Syria" 
+population$country[population$country == "Viet Nam" ] <- "Vietnam"
+population$country[population$country ==  "West Bank and Gaza Strip" ] <- "West Bank and Gaza" 
+population$country[population$country == "Congo"  ] <- "Congo (Kinshasa)"
+population$country[population$country == "United Republic of Tanzania"  ] <- "Tanzania"  
+population$country[population$country == "Republic of Moldova"] <- "Moldova" 
+population$country[population$country == "Iran (Islamic Republic of)"] <- "Iran"  
+population$country[population$country == "CÃ´te d'Ivoire"] <- "Cote d'Ivoire" 
+population$country[population$country ==  "Republic of Korea" ] <-  "Korea, South" 
+population$country[population$country == "The Former Yugoslav Republic of Macedonia"] <- "North Macedonia"  
+population$country[population$country == "Bolivia (Plurinational State of)" ] <-  "Bolivia"
+
+cont_to_remove <- list("Kosovo","Diamond Princess","Burma" , "Eswatini", "Liechtenstein","Holy See","Western Sahara","MS Zaandam")
+covid19_global <- covid19_global[ ! covid19_global$`Country/Region` %in% cont_to_remove, ]
+
+## Getting the current date, the names of the states and countries
+
+states <-  covid19_usa %>% count(state) %>% pull(state)
+countries <-  covid19_global %>% count(`Country/Region`) %>% pull(`Country/Region`)
+max_date = max(covid19_global$date)
+
+
+## Function for getting the date of the first case for countries / states
+
+days_since <- function(df,cont) {
+    df <- df %>% 
+        filter(`Country/Region` == cont) 
+    
+    max_date - df$date[which.max(df$cases >= 1)] 
+    
+}
+
+days_since_state <- function(df,sta) {
+    df <- df %>% 
+        filter(state == sta) 
+    
+    max_date - df$date[which.max(df$cases >= 1)] 
+    
+}
+
+## Function for summary statistics
+
+# ch = counter varaible that would choose between states or countries as an input
+# selected = the country or state that is selected
+# By defualt ch = True means the option is to display coutries, if the user chooses states, ch would be False and would go to the else part of the if statement
+summary_stats <- function(selected, ch){
+    
+    if(ch == "Countries"){
+        ## Created a dataframe for getting the countries along with their deaths,cofirmed and recovered cases to the latest date
+        
+        covid19_global_ch <-  covid19_global %>% 
+            group_by(`Country/Region`) %>% 
+            summarize(cases = max(cases),deaths = max(deaths), recovered = max(recovered))  
+        
+        ## Created a table with for the specific country with all the required details.
+        result <- covid19_global_ch %>%  
+            filter(`Country/Region` == selected) %>% 
+            mutate(days_since_first_case = days_since(covid19_global,selected)) %>% 
+            select(cases,deaths,recovered,days_since_first_case) 
+        ## Here removing the data frame with any NA values
+        result = result[ , colSums(is.na(result)) == 0]
+        ## Here inverted the dataframe to get a tabular form
+        result <- as.data.frame(t(result))
+        ## To remove the column headers
+        colnames(result) <- selected
+        result
+        
+    } else if (ch == "States"){
+        covid19_usa_ch <- covid19_usa %>% 
+            group_by(state) %>% 
+            summarize(cases = max(cases),deaths = max(deaths))
+        
+        result_state <- covid19_usa_ch %>% 
+            filter(state == selected) %>% 
+            mutate(days_since_first_case = days_since_state(covid19_usa,selected)) %>% 
+            select(cases,deaths,days_since_first_case) 
+        result_state = result_state[ , colSums(is.na(result_state)) == 0]
+        result_state <-  as.data.frame((t(result_state)))
+        colnames(result_state) <- selected
+        result_state
+        
+    }
+    
+}
+
+get_country_data <- function(cont_a,cont_b,cont_c,cont_d){
+    # Getting the country names and putting them into a list
+    cont_list <- list(cont_a,cont_b,cont_c,cont_d)
+    
+    
+    
+    # Reading the data that I only require,i.e: of the four countries
+    covid19_global_data <- covid19_global %>% filter(`Country/Region` %in% cont_list) %>%
+        group_by(`Country/Region`,date) %>%  
+        summarize(cases = sum(cases),deaths = sum(deaths)) %>% 
+        select(`Country/Region`,cases,deaths,date) %>% 
+        ungroup() %>% group_by(`Country/Region`) 
+    
+    # Renamed the `Country/Region` into country for joining with population
+    covid19_global_data <- covid19_global_data %>% 
+        rename(country = `Country/Region`)
+    
+    # Reading the population data population dataframe
+    cont_pop <- population %>% 
+        filter(country %in% cont_list, year == max(year)) %>% 
+        select(country,population)
+    
+    # Joining the population and country data
+    covid19_global_data <- covid19_global_data %>% left_join(cont_pop,by = 'country')
+    
+    covid19_global_data
+}
+
+## Data for plotting the states graphs(deaths, cases)
+
+get_state_data <- function(sta_a,sta_b,sta_c,sta_d) {
+    
+    # Getting the state names and putting them into a list
+    state_list <- list(sta_a,sta_b,sta_c,sta_d)
+    
+    # Reading the data that only I require for joining with population
+    state_data   <- covidtracking %>%
+        filter(state %in% state_list) %>%
+        group_by(state) %>% 
+        select(date,state,cases,deaths,fips) %>% 
+        arrange(date)
+    
+    # Reading the states population
+    state_pop <-  census_state_pop %>%
+        filter(state %in% state_list) %>%
+        select(fips = GEOID, POP)
+    
+    # Combining the both the datasets and assigning it into another column
+    state_data  <- state_data %>%
+        left_join(state_pop, by = "fips")
+    
+    state_data
+} 
+
+## Finding averages for confirmed cases
+find_mov_avg_cases <- function(df,n_value){
+    df <-  df %>% mutate(average = roll_mean(cases,n = n_value, align = "right",fill = NA)) 
+    df
+}
+
+find_mov_avg_inc_cases <- function(df,n_value){
+    df <-  df %>% mutate(average = roll_mean(cases_increase,n = n_value, align = "right",fill = NA)) 
+    df
+}
+
+
+# Deining the function for the four countries
+plot_confirmed_cases <- function(ch,cs_a,cs_b,cs_c,cs_d,log_scale = TRUE,per_capita = TRUE,avg = 0){
+    
+    # The ch argument for taking countries as input and the false part would take it to the plot states
+    if(ch == "Countries"){    
+        
+        cont_list_fin <- list(cs_a,cs_b,cs_c,cs_d)
+        # Here I got the dataframe with only the countries that were passed by the user
+        df <-  get_country_data(cs_a,cs_b,cs_c,cs_d)
+        
+        # Checking for per capita is true and adds that column to the dataframe
+        if(per_capita) {
+            df <- mutate(df,cases_increase = 1e6 * cases/population)
+            ylab <- "Increase in confirmed cases per 1M Capita"
+        }
+        
+        else{
+            ylab_n <- "Increase in confirmed cases"
+        }
+        
+        
+        # From here onwards we check for all the possiblities that the combinations of user input could be and use if statement to check for all of                       them and then plot the graph and pass it to the p value.
+        
+        if(avg == 7){
+            
+            if(per_capita){
+                
+                df <- find_mov_avg_inc_cases(df,7)
+                p <- ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +  
+                    labs(y = ylab, title = "Country-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+                
+            }
+            
+            else{
+                df <- find_mov_avg_cases(df,7)
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab_n, title = "Country-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }    
+        }
+        else if(avg == 3){
+            
+            if(per_capita){
+                
+                df <- find_mov_avg_inc_cases(df,3)
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab, title = "Country-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }      
+            
+            else{
+                df <-  find_mov_avg_cases(df,3)
+                p <-   ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab_n, title = "Country-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            } 
+        } 
+        
+        else{
+            if(per_capita){
+                p <- ggplot(df,aes(date,cases_increase)) + 
+                    geom_line(aes(color = country),size = 1.5) + 
+                    labs(y = ylab, title = "Country-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+            
+            else{
+                
+                
+                p <-  ggplot(df,aes(date,cases)) + 
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab_n, title = "Country-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+        }
+        
+    }
+    
+    ## The else part for is for the states. The same thing as above but for states
+    else{
+        df <- get_state_data(cs_a,cs_b,cs_c,cs_d)
+        
+        if(per_capita){
+            df <- mutate(df,cases_increase = 1e6 * (cases/POP))
+            ylab <- "Increase in confirmed cases per 1M capita"
+            
+        }
+        
+        else{
+            ylab_n <- "Increase in confirmed cases"
+        }
+        
+        if(avg == 7){
+            
+            if(per_capita){
+                
+                df <- mutate(df, average = roll_mean(cases_increase, n = 7, align = "right", fill = NA)) 
+                p <- ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab, title = "State-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+            
+            else{
+                
+                df <- mutate(df, average = roll_mean(cases, n = 7, align = "right", fill = NA))
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab_n, title = "State-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+        }
+        else if(avg == 3){
+            
+            if(per_capita){
+                
+                
+                df <- mutate(df, average = roll_mean(cases_increase, n = 3, align = "right", fill = NA)) 
+                p <- ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab, title = "State-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+            
+            else{
+                
+                df <- mutate(df, average = roll_mean(cases, n = 7, align = "right", fill = NA))
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab_n, title = "State-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+        }else{
+            
+            if(per_capita){
+                
+                p <- ggplot(df,aes(date,cases_increase)) + 
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab, title = "State-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+            
+            else{
+                
+                p <-  ggplot(df,aes(date,cases)) + 
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab_n, title = "State-wise split up of confirmed cases") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+        }
+        
+    } 
+    
+    
+    ## Add a log-scale to the plot
+    
+    if(log_scale){
+        
+        p <- p +  scale_y_log10(labels = scales::label_number_si()) #+ lims(y = c(1,NA))
+        
+    }
+    
+    p
+    
+}
+
+find_mov_avg_deaths <- function(df,n_value){
+    df <-  df %>% mutate(average = roll_mean(deaths,n = n_value, align = "right",fill = NA)) 
+    df
+}
+
+find_mov_avg_inc_deaths <- function(df,n_value){
+    df <-  df %>% mutate(average = roll_mean(deaths_increase,n = n_value, align = "right",fill = NA)) 
+    df
+}
+
+
+# Deining the function for the four countries
+# Deining the function for the four countries
+plot_death_cases <- function(ch,cs_a,cs_b,cs_c,cs_d,log_scale = TRUE,per_capita = TRUE,avg = 0){
+    
+    # The ch argument for taking countries as input and the false part would take it to the plot states
+    if(ch == "Countries"){    
+        # Here I got the dataframe with only the countries that were passed by the user
+        df <-  get_country_data(cs_a,cs_b,cs_c,cs_d)
+        
+        # Checking for per capita is true and adds that column to the dataframe
+        if(per_capita) {
+            df <- mutate(df,deaths_increase = 1e6 * deaths/population)
+            ylab <- "Increase in deaths per 1M Capita"
+        }
+        
+        else{
+            ylab_n <- "Increase in deaths"
+        }
+        
+        # From here onwards we check for all the possiblities that the combinations of user input could be and use if statement to check for all of                       them and then plot the graph and pass it to the p value.
+        
+        if(avg == 7){
+            
+            if(per_capita){
+                df <- find_mov_avg_inc_deaths(df,7)
+                p <- ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +  
+                    labs(y = ylab, title = "Country-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+                
+            }
+            
+            else{
+                df <- find_mov_avg_deaths(df,7)
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab_n, title = "Country-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            } 
+        }
+        else if(avg == 3){
+            
+            if(per_capita){
+                
+                df <- find_mov_avg_inc_deaths(df,3)
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab, title = "Country-wise split up deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }      
+            
+            else{
+                df <- find_mov_avg_deaths(df,3)
+                p <-   ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab_n, title = "Country-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            } 
+        } 
+        
+        else{
+            if(per_capita){
+                print(df)
+                p <- ggplot(df,aes(date,deaths_increase)) + 
+                    geom_line(aes(color = country),size = 1.5) + 
+                    labs(y = ylab, title = "Country-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+            
+            else{
+                
+                
+                p <-  ggplot(df,aes(date,deaths)) + 
+                    geom_line(aes(color = country),size = 1.5) +
+                    labs(y = ylab_n, title = "Country-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+        }
+        
+    }
+    
+    ## The else part for is for the states. The same thing as above but for states
+    else{
+        df <- get_state_data(cs_a,cs_b,cs_c,cs_d)
+        
+        if(per_capita){
+            df <- mutate(df,deaths_increase = 1e6 * (deaths/POP))
+            ylab <- "Increase in deaths per 1M capita"
+            
+        }
+        
+        else{
+            ylab_n <- "Increase in deaths"
+        }
+        
+        if(avg == 7){
+            
+            if(per_capita){
+                
+                df <- mutate(df, average = roll_mean(deaths_increase, n = 7, align = "right", fill = NA)) 
+                p <- ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab, title = "State-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+            
+            else{
+                
+                df <- mutate(df, average = roll_mean(deaths, n = 7, align = "right", fill = NA))
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab_n, title = "State-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+        }
+        else if(avg == 3){
+            
+            if(per_capita){
+                
+                
+                df <- mutate(df, average = roll_mean(deaths_increase, n = 3, align = "right", fill = NA)) 
+                p <- ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab, title = "State-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+                
+            }
+            
+            else{
+                
+                df <- mutate(df, average = roll_mean(deaths, n = 7, align = "right", fill = NA))
+                p <-  ggplot(df,aes(date,average)) +
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab_n, title = "State-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+        }else{
+            
+            if(per_capita){
+                
+                p <- ggplot(df,aes(date,deaths_increase)) + 
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab, title = "State-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+            
+            else{
+                
+                p <-  ggplot(df,aes(date,deaths)) + 
+                    geom_line(aes(color = state),size = 1.5) +
+                    labs(y = ylab_n, title = "State-wise split up of deaths") +
+                    theme_linedraw() + theme(legend.position = "bottom")
+            }
+        }
+        
+    } 
+    
+    
+    ## Add a log-scale to the plot
+    
+    if(log_scale){
+        
+        p <- p +  scale_y_log10(labels = scales::label_number_si())# + lims(y = c(1,NA))
+        
+    }
+    
+    
+    p
+    
+}
+
+
+key_table <- data.frame("State Key" = c("cases","deaths","days since 1st case"))
+key_table_cont <- data.frame("Country Key" = c("cases","deaths", "recovered","days since 1st case"))
+countries <- append(countries, values = "Blank")
+
+
+
+#-------------------------------------------------------------------------------
+# User interface & Server
+#-------------------------------------------------------------------------------
+
+
+#-------------------------------------------------------------------------------
+# User interface
+#-------------------------------------------------------------------------------
+
+ui <- fluidPage(theme = shinytheme("cosmo"),
+    titlePanel(str_glue("STAT5730 Group 2: COVID-19 Comparison")),
+    
+    fluidRow(
+        
+        column(5, offset = 0,
+               column(6,
+                      radioButtons("states_or_countries", "Comparing:", 
+                                   c("Countries", "States")),
+                      selectInput("selected_summary_1", "Compare:", countries, selected = "US", multiple = FALSE, width = "50%"),
+                      selectInput("selected_summary_2", "Compare:", countries, selected = "US", multiple = FALSE, width = "50%"),
+                      selectInput("selected_summary_3", "Compare:", countries, selected = "US", multiple = FALSE, width = "50%"),
+                      selectInput("selected_summary_4", "Compare:", countries, selected = "US", multiple = FALSE, width = "50%")
+               ),
+               
+               column(6, offset = 0,
+                      radioButtons("states_or_countries2", "Comparing:", 
+                                   c("Countries", "States"), selected = "States"),
+                      selectInput("selected_summary_5", "Compare:", states, selected = "Ohio", multiple = FALSE, width = "50%"),
+                      selectInput("selected_summary_6", "Compare:", states, selected = "Ohio", multiple = FALSE, width = "50%"),
+                      selectInput("selected_summary_7", "Compare:", states, selected = "Ohio", multiple = FALSE, width = "50%"),
+                      selectInput("selected_summary_8", "Compare:", states, selected = "Ohio", multiple = FALSE, width = "50%")
+                      
+               )
+        ),
+        column(1, offset = 0,
+               
+               div(style = "font-size: 10px; padding: 14px 0px; margin-top: -2.8em"),
+               fluidRow(
+                   tableOutput("key_table_cont"),
+                   div(style = "font-size: 10px; padding: 0px 0px; margin-top:-2em"),
+                   tableOutput("key_table")
+               )
+        ),
+        
+        column(6,
+               
+               column(2, offset = 1,
+                      fluidRow(
+                          tableOutput("summary_table"),
+                          tableOutput("summary_table5")
+                      )
+               ),
+               column(2, offset = 1,
+                      fluidRow(
+                          tableOutput("summary_table2"),
+                          tableOutput("summary_table6")
+                      )
+               ),
+               column(2, offset = 1,
+                      fluidRow(
+                          tableOutput("summary_table3"),
+                          tableOutput("summary_table7")
+                      )
+               ),
+               
+               column(2, offset = 1,
+                      fluidRow(
+                          tableOutput("summary_table4"),
+                          tableOutput("summary_table8")
+                      )
+               )
+        )
+        
+    ),
+    
+    fluidRow(
+        sidebarLayout(
+            sidebarPanel(
+                radioButtons("states_or_countries_ccplot", "Comparing Case Counts:", 
+                             c("Countries", "States")),
+                selectInput("ccplot_c1", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                selectInput("ccplot_c2", "Add to Plot::", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                selectInput("ccplot_c3", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                selectInput("ccplot_c4", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                radioButtons("log_select_caseplot", "Log?", c("Log Scale" = TRUE, "Non-Logged" = FALSE), selected = FALSE),
+                radioButtons("per_capita_caseplot", "Per Capita?", c("Per Capita" = TRUE, "Nominal" = FALSE)),
+                radioButtons("mov_avg_caseplot", "Moving Average:",c("None" = 0,3,7), selected = 0)
+
+            ),
+            mainPanel(
+                plotOutput("CasePlot")
+            )
+        )
+    ),
+    fluidRow(
+        sidebarLayout(
+            sidebarPanel(
+                radioButtons("states_or_countries_deathp", "Comparing Death Counts:", 
+                             c("Countries", "States")),
+                selectInput("dplotc1", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                selectInput("dplotc2", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                selectInput("dplotc3", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                selectInput("dplotc4", "Add to Plot:", countries, selected = "Blank", multiple = FALSE, width = "75%"),
+                radioButtons("log_select_deathplot", "Log Scale?", c("Log Scale" = TRUE, "Non-Logged" = FALSE), selected = FALSE),
+                radioButtons("per_capita_deathplot", "Per Capita Adjusted?", c("Adjust Per Capita" = TRUE, "Nominal" = FALSE)),
+                radioButtons("mov_avg_deathplot", "Moving Average:",c("None" = 0,"3" = 3,"7" = 7), selected = 0)
+  
+            ),
+            mainPanel(
+                plotOutput("DeathPlot")
+            )
+        )
+    )
+    
+    
+    
+)
+
+#-------------------------------------------------------------------------------
+# server
+#-------------------------------------------------------------------------------
+server <- function(input, output, session) {
+    
+    observe({
+        x <- input$states_or_countries
+        if (x == "Countries"){
+            list_selection <- countries
+        } else {
+            list_selection <- states
+            
+        }
+        
+        # Update dropdown options depending on radio input
+        updateSelectInput(session,
+                          inputId = "selected_summary_1",
+                          label = "Compare:",
+                          choices = list_selection,
+                          selected = ""
+        )
+        
+        updateSelectInput(session,
+                          inputId = "selected_summary_2",
+                          label = "Compare:",
+                          choices = list_selection,
+                          selected = ""
+        )
+        
+        updateSelectInput(session,
+                          inputId = "selected_summary_3",
+                          label = "Compare",
+                          choices = list_selection,
+                          selected = ""
+        )
+        
+        updateSelectInput(session,
+                          inputId = "selected_summary_4",
+                          label = "Compare",
+                          choices = list_selection,
+                          selected = ""
+        )
+        
+    })
+    
+    
+    observe({
+        x2 <- input$states_or_countries2
+        if (x2 == "Countries"){
+            list_selection2 <- countries
+        } else {
+            list_selection2 <- states
+            
+        }
+        
+        # Update dropdown options depending on radio input
+        updateSelectInput(session,
+                          inputId = "selected_summary_5",
+                          label = "Compare:",
+                          choices = list_selection2,
+                          selected = ""
+        )
+        
+        updateSelectInput(session,
+                          inputId = "selected_summary_6",
+                          label = "Compare:",
+                          choices = list_selection2,
+                          selected = ""
+        )
+        
+        updateSelectInput(session,
+                          inputId = "selected_summary_7",
+                          label = "Compare",
+                          choices = list_selection2,
+                          selected = ""
+        )
+        
+        updateSelectInput(session,
+                          inputId = "selected_summary_8",
+                          label = "Compare",
+                          choices = list_selection2,
+                          selected = ""
+        )
+        
+    })
+    
+    observe({
+        x3 <- input$states_or_countries_ccplot
+        if (x3 == "Countries"){
+            list_selection3 <- countries
+        } else {
+            list_selection3 <- states
+            
+        }
+        
+        # Update dropdown options depending on radio input
+        updateSelectInput(session,
+                          inputId = "ccplot_c1",
+                          label = "Add to Plot:",
+                          choices = list_selection3,
+                          selected = " "
+                          
+        )
+        
+        updateSelectInput(session,
+                          inputId = "ccplot_c2",
+                          label = "Add to Plot:",
+                          choices = list_selection3,
+                          selected = " "
+                          
+        )
+        
+        updateSelectInput(session,
+                          inputId = "ccplot_c3",
+                          label = "Add to Plot:",
+                          choices = list_selection3,
+                          selected = " "
+                          
+        )
+        
+        updateSelectInput(session,
+                          inputId = "ccplot_c4",
+                          label = "Add to Plot:",
+                          choices = list_selection3,
+                          selected = " "
+                        
+        )
+    })
+    
+    observe({
+        x4 <- input$states_or_countries_deathp
+        if (x4 == "Countries"){
+            list_selection4 <- countries
+        } else {
+            list_selection4 <- states
+            
+        }
+        
+        # Update dropdown options depending on radio input
+        updateSelectInput(session,
+                          inputId = "dplotc1",
+                          label = "Add to Plot:",
+                          choices = list_selection4,
+                          selected = " "
+                          
+        )
+        
+        updateSelectInput(session,
+                          inputId = "dplotc2",
+                          label = "Add to Plot:",
+                          choices = list_selection4,
+                          selected = " "
+                          
+        )
+        
+        updateSelectInput(session,
+                          inputId = "dplotc3",
+                          label = "Add to Plot:",
+                          choices = list_selection4,
+                          selected = " "
+                          
+        )
+        
+        updateSelectInput(session,
+                          inputId = "dplotc4",
+                          label = "Add to Plot:",
+                          choices = list_selection4,
+                          selected = " "
+                          
+        )
+    })
+    
+
+    
+    output$summary_table <- renderTable({
+        summary_stats(selected = input$selected_summary_1, ch = input$states_or_countries)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table2 <- renderTable({
+        summary_stats(selected = input$selected_summary_2, ch = input$states_or_countries)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table3 <- renderTable({
+        summary_stats(selected = input$selected_summary_3, ch = input$states_or_countries)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table4 <- renderTable({
+        summary_stats(selected = input$selected_summary_4, ch = input$states_or_countries)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table5 <- renderTable({
+        summary_stats(selected = input$selected_summary_5, ch = input$states_or_countries2)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table6 <- renderTable({
+        summary_stats(selected = input$selected_summary_6, ch = input$states_or_countries2)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table7 <- renderTable({
+        summary_stats(selected = input$selected_summary_7, ch = input$states_or_countries2)
+    },hover = TRUE
+    
+    )
+    
+    output$summary_table8 <- renderTable({
+        summary_stats(selected = input$selected_summary_8, ch = input$states_or_countries2)
+    },hover = TRUE
+    
+    )
+    
+    output$key_table_cont <- renderTable({
+        key_table_cont
+    }, hover = TRUE)
+    
+    output$key_table <- renderTable({
+        key_table
+    }, hover = TRUE)
+    
+    
+    output$CasePlot <- renderPlot({
+        plot_confirmed_cases(ch = input$states_or_countries_ccplot,
+                             log_scale = input$log_select_caseplot, 
+                             cs_a = input$ccplot_c1,
+                             cs_b = input$ccplot_c2,
+                             cs_c = input$ccplot_c3,
+                             cs_d = input$ccplot_c4,
+                             per_capita = input$per_capita_caseplot, 
+                             avg = input$mov_avg_caseplot 
+        )
+    })
+    
+    output$DeathPlot <- renderPlot({
+        plot_death_cases(ch = input$states_or_countries_deathp, 
+                         log_scale = input$log_select_deathplot,
+                         cs_a = input$dplotc1,
+                         cs_b = input$dplotc2,
+                         cs_c = input$dplotc3,
+                         cs_d = input$dplotc4,
+                         per_capita = input$per_capita_deathplot,
+                         avg = input$mov_avg_deathplot
+        )
+    })
+    
+}
+
+
+
+
+shinyApp(ui, server)
+
+
+
