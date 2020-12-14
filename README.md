@@ -20,7 +20,7 @@ The data has been sourced from the same link as below 👇
 
 ## Covid-19 Visualization using Jupyter
 
-### Overivew
+### Overview
 Before I decided to build a dashboard, I wanted to do some Exploratory Data Analysis with the pandemic data and see what are the insights that I could derive from that and also improve my visualization skills in python. Upon googling, I was introduced to new plotting libraries and data representation techniques that I believe I have incorporated in this notebook. The ipynb notebook has some interesting insights that I feel are important during the course of the pandemic.
 
 **Please click [here](https://nbviewer.jupyter.org/github/Kuriankkr/Covid19_Data_Analysis/blob/master/Covid_19%20Analysis.ipynb) to view the notebook. The default github notebook viewer is not compatible all the visualizations that are present in the notebook**
