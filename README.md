@@ -1,7 +1,15 @@
 # Covid 19 Dashboards
 
-## Covid-19 Visualization using Tableu
+## Covid-19 Visualization using Tableau
 
+### Overview
+
+In order to improve my Tableau dashboard skills, I decided to implement the Covid-19 dashboard on Tableau. The dashboard has data for both World view and US view. It has been hosted on Tableau online. 
+
+**Please click [here](https://public.tableau.com/profile/kurian97#!/vizhome/Covid19_workbook/USView) to view the dashboard.** 
+
+### Data
+The data has been sourced from [data world](https://data.world/associatedpress/johns-hopkins-coronavirus-case-tracker). It was added as an plugin to my dashboard. 
 
 
 ## Covid-19 Visualization using R Shiny
@@ -12,7 +20,7 @@ This dashboard is the result of a course that I had taken in graduate school (St
 
 I took care of the backend of the project which involved shaping the data, creating the visualizations and calculating the different features that would be presented as options in the front end. Sam took care of the front end of the project where he dealt with how to organize the views for the end user, how the features should be presented and made sure that both the ends worked seamlessly without glitches.
 
-**Please click [here](https://samblum.shinyapps.io/shiny/?fbclid=IwAR02s0rMRN3zAOLIls1q7FWRJ_XJFgLPLRMhZW7ZzRl1NVmn0mG1ljpgR-s) to view the notebook.** 
+**Please click [here](https://samblum.shinyapps.io/shiny/?fbclid=IwAR02s0rMRN3zAOLIls1q7FWRJ_XJFgLPLRMhZW7ZzRl1NVmn0mG1ljpgR-s) to view the dashboard.** 
 
 ### Data
 The data has been sourced from the same link as below 👇
@@ -31,6 +39,5 @@ The data has been sourced from [Covid-19 Data Repsitory by CSSE at John Hopkins 
 - [Confirmed Global Deaths](https://github.com/CSSEGISandData/COVID-19/blob/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv)
 - [Confirmed Global Recovered Cases](https://github.com/CSSEGISandData/COVID-19/blob/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv)
 
-
- 
+**Note:** This notebook has not been complete yet and I have not had time to add more visualizations
 
