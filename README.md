@@ -1,4 +1,4 @@
-# Covid 19 Dashboards
+# Covid 19 Dashboards and Visualization
 
 ## Covid-19 Visualization using Tableau
 
@@ -11,6 +11,7 @@ In order to improve my Tableau dashboard skills, I decided to implement the Covi
 ### Data
 The data has been sourced from [data world](https://data.world/associatedpress/johns-hopkins-coronavirus-case-tracker). It was added as an plugin to my dashboard. 
 
+---
 
 ## Covid-19 Visualization using R Shiny
 
@@ -25,6 +26,7 @@ I took care of the backend of the project which involved shaping the data, creat
 ### Data
 The data has been sourced from the same link as below 👇
 
+---
 
 ## Covid-19 Visualization using Jupyter
 
