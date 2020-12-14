@@ -12,7 +12,7 @@ This dashboard is the result of a course that I had taken in graduate school (St
 
 I took care of the backend of the project which involved shaping the data, creating the visualizations and calculating the different features that would be presented as options in the front end. Sam took care of the front end of the project where he dealt with how to organize the views for the end user, how the features should be presented and made sure that both the ends worked seamlessly without glitches.
 
-**Please click [here](https://samblum.shinyapps.io/shiny/?fbclid=IwAR02s0rMRN3zAOLIls1q7FWRJ_XJFgLPLRMhZW7ZzRl1NVmn0mG1ljpgR-s) to view the notebook. 
+**Please click [here](https://samblum.shinyapps.io/shiny/?fbclid=IwAR02s0rMRN3zAOLIls1q7FWRJ_XJFgLPLRMhZW7ZzRl1NVmn0mG1ljpgR-s) to view the notebook.** 
 
 ### Data
 The data has been sourced from the same link as below 👇
