@@ -5,9 +5,9 @@
 ### Overivew
 Before I decided to build a dashboard, I wanted to do some Exploratory Data Analysis with the pandemic data and see what are the insights that I could derive from that and also improve my visualization skills in python. Upon googling, I was introduced to new plotting libraries and data representation techniques that I believe I have incorporated in this notebook. The ipynb notebook has some interesting insights that I feel are important during the course of the pandemic.
 
-Please click [here] to view the notebook (https://nbviewer.jupyter.org/github/Kuriankkr/Covid19_Data_Analysis/blob/master/Covid_19%20Analysis.ipynb)
+**Please click [here](https://nbviewer.jupyter.org/github/Kuriankkr/Covid19_Data_Analysis/blob/master/Covid_19%20Analysis.ipynb) to view the notebook**. The default github notebook viewer is not compatible all the visualizations that are present in the notebook
 
-### Data
+### Data to view the notebook 
 The data has been sourced from [Covid-19 Data Repsitory by CSSE at John Hopkins University](https://github.com/CSSEGISandData/COVID-19). The data has been analyzed from **Dec 2019 -- April 2020.** Three subsets of data were used from this repository
 - [Confirmed Global Cases](https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series)
 - [Confirmed Global Deaths](https://github.com/CSSEGISandData/COVID-19/blob/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv)
