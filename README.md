@@ -43,3 +43,20 @@ The data has been sourced from [Covid-19 Data Repsitory by CSSE at John Hopkins 
 
 **Note:** This notebook has not been complete yet and I have not had time to add more visualizations
 
+
+## Technology Used
+<p>
+  <img width="200" height = "130" align='left' src="https://github.com/Kuriankkr/Kuriankkr/blob/main/Images/Tableau_logo.jpg">
+</p>
+
+<p>
+  <img width="150" height = "130" align='left' src="https://github.com/Kuriankkr/Kuriankkr/blob/main/Images/R.png">
+</p>
+
+<p>
+  <img width="300" height = "200" align='left' src="https://github.com/Kuriankkr/Kuriankkr/blob/main/Images/Pandas_Image.png">
+</p>
+
+
+    
+
