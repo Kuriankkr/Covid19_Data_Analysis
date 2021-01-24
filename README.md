@@ -1,4 +1,4 @@
-# Covid 19 Dashboards and Visualization
+# Covid 19 Dashboards and Visualizations
 
 ## Covid-19 Visualization using Tableau
 
